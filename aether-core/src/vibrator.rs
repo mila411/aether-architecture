@@ -1,6 +1,7 @@
 //! Vibrator - a vibrating entity on the Aether layer (microservice)
 
 use crate::{aether::Aether, channel::Channel, wave::Wave, Result};
+use bytes::Bytes;
 use tokio::sync::broadcast;
 use tracing::{debug, info};
 
@@ -15,6 +16,9 @@ pub struct VibratorConfig {
 
     /// Receive buffer size
     pub buffer_size: usize,
+
+    /// Auth token for wave authentication
+    pub auth_token: Option<String>,
 }
 
 impl VibratorConfig {
@@ -23,11 +27,17 @@ impl VibratorConfig {
             name: name.into(),
             resonant_channels: Vec::new(),
             buffer_size: 100,
+            auth_token: None,
         }
     }
 
     pub fn with_channels(mut self, channels: Vec<Channel>) -> Self {
         self.resonant_channels = channels;
+        self
+    }
+
+    pub fn with_auth_token(mut self, token: Option<String>) -> Self {
+        self.auth_token = token;
         self
     }
 }
@@ -46,6 +56,14 @@ pub struct Vibrator {
 
     /// Receivers for resonant channels
     receivers: Vec<(Channel, broadcast::Receiver<Wave>)>,
+}
+
+/// Lightweight emitter handle for concurrent tasks
+#[derive(Clone)]
+pub struct VibratorEmitter {
+    name: String,
+    aether: Aether,
+    auth_token: Option<String>,
 }
 
 impl Vibrator {
@@ -92,7 +110,10 @@ impl Vibrator {
     }
 
     /// Emit a wave (send a message)
-    pub async fn emit(&self, wave: Wave) -> Result<()> {
+    pub async fn emit(&self, mut wave: Wave) -> Result<()> {
+        if let Some(token) = &self.config.auth_token {
+            wave.set_auth_token(token.clone());
+        }
         debug!("Vibrator {} emitted wave {}", self.config.name, wave.id());
         self.aether.emit(wave).await
     }
@@ -109,6 +130,25 @@ impl Vibrator {
             .build();
 
         self.emit(wave).await
+    }
+
+    /// Build and emit a wave with raw bytes payload (zero-copy)
+    pub async fn emit_bytes(&self, channel: impl Into<Channel>, payload: Bytes) -> Result<()> {
+        let wave = Wave::builder(channel)
+            .payload_bytes(payload)
+            .source(self.config.name.clone())
+            .build();
+
+        self.emit(wave).await
+    }
+
+    /// Create a lightweight emitter handle for concurrent tasks
+    pub fn emitter(&self) -> VibratorEmitter {
+        VibratorEmitter {
+            name: self.config.name.clone(),
+            aether: self.aether.clone(),
+            auth_token: self.config.auth_token.clone(),
+        }
     }
 
     /// Receive the next wave (from any channel)
@@ -175,6 +215,42 @@ impl Vibrator {
     /// Get list of resonant channels
     pub fn resonant_channels(&self) -> Vec<Channel> {
         self.receivers.iter().map(|(ch, _)| ch.clone()).collect()
+    }
+}
+
+impl VibratorEmitter {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub async fn emit(&self, wave: Wave) -> Result<()> {
+        let mut wave = wave;
+        if let Some(token) = &self.auth_token {
+            wave.set_auth_token(token.clone());
+        }
+        self.aether.emit(wave).await
+    }
+
+    pub async fn emit_wave(
+        &self,
+        channel: impl Into<Channel>,
+        payload: serde_json::Value,
+    ) -> Result<()> {
+        let wave = Wave::builder(channel)
+            .payload(payload)
+            .source(self.name.clone())
+            .build();
+
+        self.emit(wave).await
+    }
+
+    pub async fn emit_bytes(&self, channel: impl Into<Channel>, payload: Bytes) -> Result<()> {
+        let wave = Wave::builder(channel)
+            .payload_bytes(payload)
+            .source(self.name.clone())
+            .build();
+
+        self.emit(wave).await
     }
 }
 

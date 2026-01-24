@@ -1,0 +1,52 @@
+[aether]
+channel_buffer_size = 1000
+max_propagation = 10
+attenuation_factor = 0.95
+enable_physics = true
+use_nats = true
+nats_url = "nats://127.0.0.1:4222"
+nats_tls_required = false
+# auth_token = "${AETHER_AUTH_TOKEN}"
+# allowed_sources = ["service-alpha", "service-beta", "aether-gateway"]
+max_payload_bytes = 1048576
+max_channel_length = 128
+# nats_mtls_ca_path = "./certs/ca.pem"
+# nats_mtls_client_cert_path = "./certs/client.pem"
+# nats_mtls_client_key_path = "./certs/client.key"
+persistence_enabled = false
+persistence_path = "./data/aether"
+snapshot_interval = 1000
+
+[logging]
+level = "info"
+
+[service]
+max_inflight = 100
+# rate_limit_per_sec = 50.0
+timeout_ms = 2000
+retry_max = 3
+retry_base_delay_ms = 50
+retry_max_delay_ms = 500
+circuit_breaker_failure_threshold = 5
+circuit_breaker_open_ms = 10000
+circuit_breaker_half_open_successes = 2
+
+[observability]
+log_json = false
+metrics_enabled = false
+metrics_bind = "127.0.0.1:9000"
+# otlp_endpoint = "http://127.0.0.1:4317"
+
+[operations]
+health_enabled = true
+health_bind = "127.0.0.1:8080"
+shutdown_grace_ms = 5000
+# memory_limit_bytes = 1073741824
+# cpu_time_limit_secs = 120
+
+[resource_monitoring]
+enabled = true
+interval_ms = 1000
+leak_detection_enabled = false
+leak_growth_bytes_per_min = 10485760
+allocator_metrics_enabled = false

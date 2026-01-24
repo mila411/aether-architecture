@@ -21,7 +21,21 @@ async-trait = "0.1"
 uuid = { version = "1.11", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 tracing = "0.1"
-tracing-subscriber = "0.3"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 anyhow = "1.0"
 async-nats = "0.38"
 futures = "0.3"
+config = "0.14"
+notify = "6.1"
+metrics = "0.22.4"
+metrics-exporter-prometheus = "0.13"
+opentelemetry = "0.23"
+opentelemetry_sdk = { version = "0.23", features = ["rt-tokio"] }
+opentelemetry-otlp = { version = "0.16", features = ["tonic"] }
+tracing-opentelemetry = "0.24"
+bytes = { version = "1.7", features = ["serde"] }
+sled = "0.34"
+libc = "0.2"
+sysinfo = "0.30"
+jemallocator = "0.5"
+jemalloc-ctl = "0.5"

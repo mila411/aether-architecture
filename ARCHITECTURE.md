@@ -287,6 +287,19 @@ let config = AetherConfig {
 };
 ```
 
+## Production hardening (Rust)
+
+- **Config management**: typed config, environment overlays, hot reload
+- **Observability**: `tracing` logs, Prometheus metrics, OTLP tracing
+- **Reliability**: retry/timeout/circuit breaker
+- **Backpressure**: task management + rate limiting
+- **Performance**: zero‑copy payloads (`bytes`) and buffer pool
+- **Persistence**: append‑only log + snapshot, restart recovery
+- **Security**: TLS/mTLS, auth/allow‑list, payload validation
+- **Operations**: graceful shutdown, health checks, panic hook, resource limits
+- **Resource monitoring**: RSS/VMS, leak hints, allocator metrics
+- **Testing**: property tests, benchmarks, fault injection
+
 ## Best practices
 
 1. **Channel naming conventions**
@@ -333,7 +346,7 @@ let config = AetherConfig {
 
 ## Next steps
 
-- **Distributed tracing**: Implement distributed tracing using wave IDs
-- **Persistence**: Persist waves and add replay functionality
-- **Security**: Channel‑level access control
-- **Scaling**: Clustering multiple Aether layer instances
+- **Channel‑level ACLs**: fine‑grained authorization per channel
+- **mTLS rotation**: certificate reload without restart
+- **Replay control**: selective replay filters and retention policies
+- **Scaling**: clustering multiple Aether layer instances

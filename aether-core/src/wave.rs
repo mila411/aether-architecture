@@ -4,6 +4,7 @@ use crate::channel::Channel;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use bytes::Bytes;
 
 /// Wave amplitude (represents importance)
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -53,6 +54,9 @@ pub enum WaveType {
 /// Wave message propagating through the Aether layer
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Wave {
+    /// Schema version
+    #[serde(default = "default_schema_version")]
+    schema_version: u16,
     /// Wave unique identifier
     id: Uuid,
 
@@ -65,6 +69,10 @@ pub struct Wave {
     /// Payload
     payload: serde_json::Value,
 
+    /// Raw bytes payload (zero-copy)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    payload_bytes: Option<Bytes>,
+
     /// Amplitude (importance)
     amplitude: Amplitude,
 
@@ -75,12 +83,15 @@ pub struct Wave {
     timestamp: DateTime<Utc>,
 
     /// Metadata
+    #[serde(default)]
     metadata: serde_json::Value,
 
     /// Wave phase (current state)
+    #[serde(default)]
     phase: f64,
 
     /// Propagation count (hop count)
+    #[serde(default)]
     propagation_count: u32,
 }
 
@@ -88,10 +99,30 @@ impl Wave {
     /// Create a new wave
     pub fn new(channel: impl Into<Channel>, payload: serde_json::Value) -> Self {
         Self {
+            schema_version: current_schema_version(),
             id: Uuid::new_v4(),
             wave_type: WaveType::Event,
             channel: channel.into(),
             payload,
+            payload_bytes: None,
+            amplitude: Amplitude::default(),
+            source: None,
+            timestamp: Utc::now(),
+            metadata: serde_json::json!({}),
+            phase: 0.0,
+            propagation_count: 0,
+        }
+    }
+
+    /// Create a new wave with raw bytes payload
+    pub fn new_bytes(channel: impl Into<Channel>, payload: Bytes) -> Self {
+        Self {
+            schema_version: current_schema_version(),
+            id: Uuid::new_v4(),
+            wave_type: WaveType::Event,
+            channel: channel.into(),
+            payload: serde_json::Value::Null,
+            payload_bytes: Some(payload),
             amplitude: Amplitude::default(),
             source: None,
             timestamp: Utc::now(),
@@ -115,12 +146,35 @@ impl Wave {
         &self.wave_type
     }
 
+    pub fn schema_version(&self) -> u16 {
+        self.schema_version
+    }
+
     pub fn channel(&self) -> &Channel {
         &self.channel
     }
 
     pub fn payload(&self) -> &serde_json::Value {
         &self.payload
+    }
+
+    pub fn payload_bytes(&self) -> Option<&Bytes> {
+        self.payload_bytes.as_ref()
+    }
+
+    pub fn auth_token(&self) -> Option<&str> {
+        self.metadata
+            .get("auth_token")
+            .and_then(|v| v.as_str())
+    }
+
+    pub fn set_auth_token(&mut self, token: impl Into<String>) {
+        let token = token.into();
+        if let Some(obj) = self.metadata.as_object_mut() {
+            obj.insert("auth_token".to_string(), serde_json::Value::String(token));
+        } else {
+            self.metadata = serde_json::json!({ "auth_token": token });
+        }
     }
 
     pub fn amplitude(&self) -> &Amplitude {
@@ -137,6 +191,11 @@ impl Wave {
 
     pub fn propagation_count(&self) -> u32 {
         self.propagation_count
+    }
+
+    /// Schema compatibility check
+    pub fn is_compatible(&self) -> bool {
+        self.schema_version <= current_schema_version()
     }
 
     /// Propagate the wave (increment hop count)
@@ -166,10 +225,12 @@ impl Wave {
 pub struct WaveBuilder {
     channel: Channel,
     payload: Option<serde_json::Value>,
+    payload_bytes: Option<Bytes>,
     wave_type: WaveType,
     amplitude: Amplitude,
     source: Option<String>,
     metadata: serde_json::Value,
+    schema_version: u16,
 }
 
 impl WaveBuilder {
@@ -177,15 +238,22 @@ impl WaveBuilder {
         Self {
             channel: channel.into(),
             payload: None,
+            payload_bytes: None,
             wave_type: WaveType::Event,
             amplitude: Amplitude::default(),
             source: None,
             metadata: serde_json::json!({}),
+            schema_version: current_schema_version(),
         }
     }
 
     pub fn payload(mut self, payload: serde_json::Value) -> Self {
         self.payload = Some(payload);
+        self
+    }
+
+    pub fn payload_bytes(mut self, payload: Bytes) -> Self {
+        self.payload_bytes = Some(payload);
         self
     }
 
@@ -209,12 +277,21 @@ impl WaveBuilder {
         self
     }
 
+    pub fn schema_version(mut self, version: u16) -> Self {
+        self.schema_version = version;
+        self
+    }
+
     pub fn build(self) -> Wave {
         Wave {
+            schema_version: self.schema_version,
             id: Uuid::new_v4(),
             wave_type: self.wave_type,
             channel: self.channel,
-            payload: self.payload.unwrap_or(serde_json::json!({})),
+            payload: self
+                .payload
+                .unwrap_or_else(|| if self.payload_bytes.is_some() { serde_json::Value::Null } else { serde_json::json!({}) }),
+            payload_bytes: self.payload_bytes,
             amplitude: self.amplitude,
             source: self.source,
             timestamp: Utc::now(),
@@ -223,6 +300,14 @@ impl WaveBuilder {
             propagation_count: 0,
         }
     }
+}
+
+fn current_schema_version() -> u16 {
+    1
+}
+
+fn default_schema_version() -> u16 {
+    1
 }
 
 #[cfg(test)]

@@ -17,7 +17,33 @@ anyhow.workspace = true
 async-nats.workspace = true
 futures.workspace = true
 thiserror = "1.0"
+config.workspace = true
+notify.workspace = true
+metrics.workspace = true
+metrics-exporter-prometheus.workspace = true
+opentelemetry.workspace = true
+opentelemetry_sdk.workspace = true
+opentelemetry-otlp.workspace = true
+tracing-opentelemetry.workspace = true
+tracing-subscriber.workspace = true
+bytes.workspace = true
+sled.workspace = true
+libc.workspace = true
+sysinfo.workspace = true
+jemallocator = { workspace = true, optional = true }
+jemalloc-ctl = { workspace = true, optional = true }
+
+[features]
+jemalloc = ["jemallocator", "jemalloc-ctl"]
+
+[dev-dependencies]
+proptest = "1.5"
+criterion = { version = "0.5", features = ["async"] }
 
 [lib]
 name = "aether_core"
 path = "src/lib.rs"
+
+[[bench]]
+name = "aether_bench"
+harness = false

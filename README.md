@@ -62,6 +62,20 @@
 - **Interference patterns**: Interactions among multiple messages
 - **Resonance detection**: Automatic discovery of related services
 
+## ✅ Production features (Rust)
+
+- **Config management**: Environment overlays, typed config, hot reload
+- **Observability**: Structured logs, Prometheus metrics, OTLP tracing
+- **Error handling**: Contextual errors, recoverable/unrecoverable distinction
+- **Backpressure**: Task management, channel capacity control, rate limiting
+- **Performance**: Zero‑copy payloads (`bytes`), buffer pool
+- **Reliability**: Retry/timeout/circuit breaker
+- **Persistence**: Append‑only log + snapshot, restart recovery
+- **Security**: TLS/mTLS, auth/allow‑list, input validation, secret handling
+- **Operations**: Graceful shutdown, health checks, panic hook, resource limits
+- **Testing**: Property tests, benchmarks, fault injection
+- **Resource monitoring**: RSS/VMS, leak hints, allocator metrics
+
 ## 📦 Project structure
 
 ```
@@ -89,8 +103,7 @@ use aether_core::{Aether, AetherConfig};
 
 #[tokio::main]
 async fn main() {
-    let aether = Aether::new(AetherConfig::default()).await;
-    aether.start().await;
+    let aether = Aether::new(AetherConfig::default());
 }
 ```
 
