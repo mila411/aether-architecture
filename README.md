@@ -58,6 +58,8 @@
 - **Complete loose coupling**: Services only know the aether, not each other
 - **Dynamic propagation**: Messages naturally travel like waves
 - **Frequency‑based routing**: Message filtering by channel (frequency)
+- **Time‑synchronized frequency hopping**: Channel changes by time slot for concealment and robustness
+- **Noise floor filtering**: Drop low‑amplitude waves to hide services and reduce noise
 - **Attenuation and re‑amplification**: Message lifetime control and resend control
 - **Interference patterns**: Interactions among multiple messages
 - **Resonance detection**: Automatic discovery of related services
@@ -87,10 +89,19 @@ aether-architecture/
 │   │   ├── wave.rs        # Wave messages
 │   │   ├── vibrator.rs    # Service vibrator
 │   │   └── physics.rs     # Physics simulation
+│   ├── benches/
+│   │   └── aether_bench.rs
+│   ├── examples/
+│   │   └── hopping_demo.rs
+│   ├── tests/
+│   │   ├── fault_injection.rs
+│   │   └── property_tests.rs
 │   └── Cargo.toml
 ├── aether-service-alpha/  # Sample service A
 ├── aether-service-beta/   # Sample service B
 ├── aether-gateway/        # Aether gateway
+├── config/                # Default configs
+│   └── default.toml
 └── Cargo.toml
 ```
 
