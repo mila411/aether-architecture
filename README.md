@@ -251,6 +251,40 @@ while let Some(wave) = service.receive().await {
 }
 ```
 
+#### 4. Time‑synchronized hopping & noise floor (quick demo)
+
+Time‑based frequency hopping rotates the channel each time slot. The noise floor filters weak waves so only “visible” signals are processed.
+
+```rust
+use aether_core::{Vibrator, Channel, Wave};
+
+let hop_count = 4;
+let hop_interval_ms = 200;
+
+let mut receiver = Vibrator::create("receiver", &aether).await;
+receiver.resonate_hopping(Channel::new("orders"), hop_count).await;
+
+let sender = Vibrator::create("sender", &aether).await;
+sender
+    .emit_time_hopping_wave(
+        Channel::new("orders"),
+        hop_count,
+        hop_interval_ms,
+        serde_json::json!({"msg": "hop"}),
+    )
+    .await?;
+```
+
+Optional config (examples):
+
+```toml
+[aether]
+min_amplitude = 0.01
+
+[service]
+noise_floor = 0.05
+```
+
 ### Run the samples
 
 #### Terminal 1: Start NATS

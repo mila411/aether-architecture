@@ -78,7 +78,8 @@ async fn main() -> anyhow::Result<()> {
     };
     let config = VibratorConfig::new(app_config.service.name.clone())
         .with_channels(channels)
-        .with_auth_token(app_config.aether.auth_token.clone());
+        .with_auth_token(app_config.aether.auth_token.clone())
+        .with_noise_floor(app_config.service.noise_floor);
 
     let mut vibrator = Vibrator::new(config, &aether).await;
     let emitter = vibrator.emitter();

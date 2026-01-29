@@ -19,6 +19,9 @@ pub struct AetherConfig {
     /// Attenuation factor
     pub attenuation_factor: f64,
 
+    /// Minimum amplitude accepted by the Aether layer
+    pub min_amplitude: f64,
+
     /// Enable physics engine
     pub enable_physics: bool,
 
@@ -68,6 +71,7 @@ impl Default for AetherConfig {
             channel_buffer_size: 1000,
             max_propagation: 10,
             attenuation_factor: 0.95,
+            min_amplitude: 0.01,
             enable_physics: true,
             use_nats: true,
             nats_url: "nats://127.0.0.1:4222".to_string(),
@@ -199,7 +203,7 @@ impl Aether {
         }
 
         // Validity check
-        if !wave.is_valid() {
+        if !wave.is_valid_with_threshold(self.config.min_amplitude) {
             debug!("Skipping invalid wave {}", wave.id());
             return Ok(());
         }

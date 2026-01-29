@@ -1,10 +1,10 @@
 //! Wave - wave message propagating through the Aether layer
 
 use crate::channel::Channel;
+use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use bytes::Bytes;
 
 /// Wave amplitude (represents importance)
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -95,6 +95,8 @@ pub struct Wave {
     propagation_count: u32,
 }
 
+const DEFAULT_MIN_AMPLITUDE: f64 = 0.01;
+
 impl Wave {
     /// Create a new wave
     pub fn new(channel: impl Into<Channel>, payload: serde_json::Value) -> Self {
@@ -163,9 +165,7 @@ impl Wave {
     }
 
     pub fn auth_token(&self) -> Option<&str> {
-        self.metadata
-            .get("auth_token")
-            .and_then(|v| v.as_str())
+        self.metadata.get("auth_token").and_then(|v| v.as_str())
     }
 
     pub fn set_auth_token(&mut self, token: impl Into<String>) {
@@ -209,7 +209,12 @@ impl Wave {
 
     /// Whether the wave is valid (amplitude above threshold)
     pub fn is_valid(&self) -> bool {
-        self.amplitude.value() > 0.01
+        self.is_valid_with_threshold(DEFAULT_MIN_AMPLITUDE)
+    }
+
+    /// Whether the wave is valid (amplitude above a custom threshold)
+    pub fn is_valid_with_threshold(&self, min_amplitude: f64) -> bool {
+        self.amplitude.value() > min_amplitude
     }
 
     /// Apply attenuation over time
@@ -288,9 +293,13 @@ impl WaveBuilder {
             id: Uuid::new_v4(),
             wave_type: self.wave_type,
             channel: self.channel,
-            payload: self
-                .payload
-                .unwrap_or_else(|| if self.payload_bytes.is_some() { serde_json::Value::Null } else { serde_json::json!({}) }),
+            payload: self.payload.unwrap_or_else(|| {
+                if self.payload_bytes.is_some() {
+                    serde_json::Value::Null
+                } else {
+                    serde_json::json!({})
+                }
+            }),
             payload_bytes: self.payload_bytes,
             amplitude: self.amplitude,
             source: self.source,

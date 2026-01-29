@@ -2,6 +2,7 @@
 channel_buffer_size = 1000
 max_propagation = 10
 attenuation_factor = 0.95
+min_amplitude = 0.01
 enable_physics = true
 use_nats = true
 nats_url = "nats://127.0.0.1:4222"
@@ -30,6 +31,7 @@ retry_max_delay_ms = 500
 circuit_breaker_failure_threshold = 5
 circuit_breaker_open_ms = 10000
 circuit_breaker_half_open_successes = 2
+noise_floor = 0.01
 
 [observability]
 log_json = false

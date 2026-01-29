@@ -9,11 +9,13 @@ fn bench_emit(c: &mut Criterion) {
     });
 
     c.bench_function("aether_emit", |b| {
-        b.to_async(&rt).iter(|| async {
-            let wave = Wave::builder(Channel::new("bench.emit"))
-                .payload(serde_json::json!({"data": "x"}))
-                .build();
-            let _ = aether.emit(wave).await;
+        b.iter(|| {
+            rt.block_on(async {
+                let wave = Wave::builder(Channel::new("bench.emit"))
+                    .payload(serde_json::json!({"data": "x"}))
+                    .build();
+                let _ = aether.emit(wave).await;
+            })
         })
     });
 }

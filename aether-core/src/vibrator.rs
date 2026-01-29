@@ -19,6 +19,9 @@ pub struct VibratorConfig {
 
     /// Auth token for wave authentication
     pub auth_token: Option<String>,
+
+    /// Noise floor (waves below this amplitude are ignored)
+    pub noise_floor: f64,
 }
 
 impl VibratorConfig {
@@ -28,6 +31,7 @@ impl VibratorConfig {
             resonant_channels: Vec::new(),
             buffer_size: 100,
             auth_token: None,
+            noise_floor: 0.01,
         }
     }
 
@@ -38,6 +42,11 @@ impl VibratorConfig {
 
     pub fn with_auth_token(mut self, token: Option<String>) -> Self {
         self.auth_token = token;
+        self
+    }
+
+    pub fn with_noise_floor(mut self, noise_floor: f64) -> Self {
+        self.noise_floor = noise_floor;
         self
     }
 }
@@ -109,6 +118,12 @@ impl Vibrator {
         }
     }
 
+    /// Resonate on a frequency hopping set derived from a base channel
+    pub async fn resonate_hopping(&mut self, base: Channel, hop_count: u16) {
+        let hop_channels = base.hop_set(hop_count);
+        self.resonate_on_many(hop_channels).await;
+    }
+
     /// Emit a wave (send a message)
     pub async fn emit(&self, mut wave: Wave) -> Result<()> {
         if let Some(token) = &self.config.auth_token {
@@ -130,6 +145,31 @@ impl Vibrator {
             .build();
 
         self.emit(wave).await
+    }
+
+    /// Build and emit a frequency-hopped wave
+    pub async fn emit_hopping_wave(
+        &self,
+        base_channel: impl Into<Channel>,
+        hop_index: u16,
+        hop_count: u16,
+        payload: serde_json::Value,
+    ) -> Result<()> {
+        let channel = base_channel.into().hop(hop_index, hop_count);
+        self.emit_wave(channel, payload).await
+    }
+
+    /// Build and emit a time-synchronized frequency-hopped wave
+    pub async fn emit_time_hopping_wave(
+        &self,
+        base_channel: impl Into<Channel>,
+        hop_count: u16,
+        hop_interval_ms: u64,
+        payload: serde_json::Value,
+    ) -> Result<()> {
+        let base = base_channel.into();
+        let channel = base.hop_now(hop_count, hop_interval_ms);
+        self.emit_wave(channel, payload).await
     }
 
     /// Build and emit a wave with raw bytes payload (zero-copy)
@@ -169,6 +209,10 @@ impl Vibrator {
                             }
                         }
 
+                        if wave.amplitude().value() < self.config.noise_floor {
+                            continue;
+                        }
+
                         debug!(
                             "Vibrator {} received wave {} from channel {}",
                             self.config.name,
@@ -198,9 +242,21 @@ impl Vibrator {
     pub async fn receive_from(&mut self, channel: &Channel) -> Option<Wave> {
         for (ch, receiver) in &mut self.receivers {
             if ch == channel {
-                match receiver.recv().await {
-                    Ok(wave) => return Some(wave),
-                    Err(_) => return None,
+                loop {
+                    match receiver.recv().await {
+                        Ok(wave) => {
+                            if let Some(source) = wave.source() {
+                                if source == self.config.name {
+                                    continue;
+                                }
+                            }
+                            if wave.amplitude().value() < self.config.noise_floor {
+                                continue;
+                            }
+                            return Some(wave);
+                        }
+                        Err(_) => return None,
+                    }
                 }
             }
         }
@@ -244,6 +300,29 @@ impl VibratorEmitter {
         self.emit(wave).await
     }
 
+    pub async fn emit_hopping_wave(
+        &self,
+        base_channel: impl Into<Channel>,
+        hop_index: u16,
+        hop_count: u16,
+        payload: serde_json::Value,
+    ) -> Result<()> {
+        let channel = base_channel.into().hop(hop_index, hop_count);
+        self.emit_wave(channel, payload).await
+    }
+
+    pub async fn emit_time_hopping_wave(
+        &self,
+        base_channel: impl Into<Channel>,
+        hop_count: u16,
+        hop_interval_ms: u64,
+        payload: serde_json::Value,
+    ) -> Result<()> {
+        let base = base_channel.into();
+        let channel = base.hop_now(hop_count, hop_interval_ms);
+        self.emit_wave(channel, payload).await
+    }
+
     pub async fn emit_bytes(&self, channel: impl Into<Channel>, payload: Bytes) -> Result<()> {
         let wave = Wave::builder(channel)
             .payload_bytes(payload)
@@ -257,10 +336,19 @@ impl VibratorEmitter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::aether::AetherConfig;
+    use tokio::time::{timeout, Duration};
+
+    fn test_aether() -> Aether {
+        Aether::new(AetherConfig {
+            use_nats: false,
+            ..AetherConfig::default()
+        })
+    }
 
     #[tokio::test]
     async fn test_vibrator_creation() {
-        let aether = Aether::default();
+        let aether = test_aether();
         let config = VibratorConfig::new("test-vibrator");
         let vibrator = Vibrator::new(config, &aether).await;
 
@@ -269,7 +357,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_vibrator_emit_and_receive() {
-        let aether = Aether::default();
+        let aether = test_aether();
         let channel = Channel::new("test.communication");
 
         let mut vibrator1 = Vibrator::create("vibrator-1", &aether).await;
@@ -290,5 +378,62 @@ mod tests {
         // vibrator2 receives
         let wave = vibrator2.receive_from(&channel).await;
         assert!(wave.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_vibrator_noise_floor_filters_low_amplitude() {
+        let aether = test_aether();
+        let channel = Channel::new("noise.floor");
+
+        let mut receiver = Vibrator::new(
+            VibratorConfig::new("receiver").with_noise_floor(0.5),
+            &aether,
+        )
+        .await;
+        let sender = Vibrator::create("sender", &aether).await;
+
+        receiver.resonate_on(channel.clone()).await;
+
+        let low_wave = Wave::builder(channel.clone())
+            .payload(serde_json::json!({"msg": "low"}))
+            .amplitude(0.1)
+            .build();
+
+        sender.emit(low_wave).await.unwrap();
+
+        let result = timeout(Duration::from_millis(50), receiver.receive()).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_vibrator_time_hopping_emit_is_received() {
+        let aether = test_aether();
+        let base = Channel::new("orders");
+        let hop_count = 4;
+        let hop_interval_ms = 50;
+
+        let mut receiver = Vibrator::create("receiver", &aether).await;
+        receiver.resonate_hopping(base.clone(), hop_count).await;
+
+        let sender = Vibrator::create("sender", &aether).await;
+        sender
+            .emit_time_hopping_wave(
+                base.clone(),
+                hop_count,
+                hop_interval_ms,
+                serde_json::json!({"msg": "hop"}),
+            )
+            .await
+            .unwrap();
+
+        let wave = timeout(Duration::from_millis(100), receiver.receive())
+            .await
+            .ok()
+            .flatten();
+
+        assert!(wave.is_some());
+        let wave = wave.unwrap();
+        let hops = base.hop_set(hop_count);
+        assert!(hops.iter().any(|h| h.name() == wave.channel().name()));
     }
 }

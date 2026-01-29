@@ -83,6 +83,8 @@ pub struct ServiceConfig {
     pub circuit_breaker_open_ms: u64,
     #[serde(default = "default_circuit_half_open_successes")]
     pub circuit_breaker_half_open_successes: usize,
+    #[serde(default = "default_noise_floor")]
+    pub noise_floor: f64,
 }
 
 impl Default for ServiceConfig {
@@ -99,6 +101,7 @@ impl Default for ServiceConfig {
             circuit_breaker_failure_threshold: default_circuit_failure_threshold(),
             circuit_breaker_open_ms: default_circuit_open_ms(),
             circuit_breaker_half_open_successes: default_circuit_half_open_successes(),
+            noise_floor: default_noise_floor(),
         }
     }
 }
@@ -133,6 +136,10 @@ fn default_circuit_open_ms() -> u64 {
 
 fn default_circuit_half_open_successes() -> usize {
     2
+}
+
+fn default_noise_floor() -> f64 {
+    0.01
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -280,6 +287,8 @@ pub struct AetherLayerConfig {
     pub max_propagation: u32,
     #[serde(default = "default_attenuation_factor")]
     pub attenuation_factor: f64,
+    #[serde(default = "default_min_amplitude")]
+    pub min_amplitude: f64,
     #[serde(default = "default_enable_physics")]
     pub enable_physics: bool,
     #[serde(default = "default_use_nats")]
@@ -323,6 +332,7 @@ impl Default for AetherLayerConfig {
             channel_buffer_size: default_channel_buffer_size(),
             max_propagation: default_max_propagation(),
             attenuation_factor: default_attenuation_factor(),
+            min_amplitude: default_min_amplitude(),
             enable_physics: default_enable_physics(),
             use_nats: default_use_nats(),
             nats_url: default_nats_url(),
@@ -347,6 +357,7 @@ impl From<AetherLayerConfig> for AetherConfig {
             channel_buffer_size: config.channel_buffer_size,
             max_propagation: config.max_propagation,
             attenuation_factor: config.attenuation_factor,
+            min_amplitude: config.min_amplitude,
             enable_physics: config.enable_physics,
             use_nats: config.use_nats,
             nats_url: config.nats_url,
@@ -375,6 +386,10 @@ fn default_max_propagation() -> u32 {
 
 fn default_attenuation_factor() -> f64 {
     0.95
+}
+
+fn default_min_amplitude() -> f64 {
+    0.01
 }
 
 fn default_enable_physics() -> bool {
