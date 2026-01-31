@@ -332,6 +332,19 @@ You can observe all waves in the Gateway.
 cargo test
 ```
 
+### TLS demo (certificate generation + run)
+
+```bash
+./scripts/gen_tls_certs.sh
+nats-server -c config/nats-tls.conf
+```
+
+In another terminal:
+
+```bash
+cargo run -p aether-core --example tls_demo
+```
+
 ### Documentation
 
 - [Architecture guide](./ARCHITECTURE.md) - Detailed implementation guide

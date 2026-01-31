@@ -1,6 +1,7 @@
 //! Aether - Aether layer implementation
 
 use crate::{channel::Channel, wave::Wave, AetherError, Result};
+use async_nats::ConnectOptions;
 use futures::StreamExt;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -449,7 +450,26 @@ impl Aether {
                         "TLS required for NATS connection".to_string(),
                     ));
                 }
-                async_nats::connect(url)
+
+                let mut options = ConnectOptions::new();
+
+                if tls_required {
+                    options = options.require_tls(true);
+                }
+
+                if let Some(ca_path) = &self.config.nats_mtls_ca_path {
+                    options = options.add_root_certificates(ca_path.into());
+                }
+
+                if let (Some(cert_path), Some(key_path)) = (
+                    &self.config.nats_mtls_client_cert_path,
+                    &self.config.nats_mtls_client_key_path,
+                ) {
+                    options = options.add_client_certificate(cert_path.into(), key_path.into());
+                }
+
+                options
+                    .connect(url)
                     .await
                     .map_err(|e| AetherError::ConnectionFailed(e.to_string()))
             })
